@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Kode Warna ANSI
+# Kode Warna ANSI (100% Didukung Termux)
 CYAN='\033[1;36m'
 GREEN='\033[1;32m'
 YELLOW='\033[1;33m'
@@ -15,6 +15,7 @@ touch "$JOB_FILE"
 
 clear
 
+# Fungsi perbaikan nomor (Hanya hapus angka 0 depan)
 format_nomor() {
     local num="$1"
     if [[ $num == 0* ]]; then
@@ -24,6 +25,7 @@ format_nomor() {
     fi
 }
 
+# Fungsi membersihkan jadwal yang sudah selesai / kadaluarsa
 clean_jobs() {
     if [ -f "$JOB_FILE" ]; then
         local tmp_file="$HOME/.wa_jobs.tmp"
@@ -37,6 +39,7 @@ clean_jobs() {
     fi
 }
 
+# Fungsi membatalkan jadwal aktif
 batalkan_jadwal() {
     clean_jobs
     if [ ! -s "$JOB_FILE" ]; then
@@ -50,9 +53,9 @@ batalkan_jadwal() {
     echo -e "${CYAN}==========================================================${NC}"
     
     local count=1
-    declare -A map_pid
-    declare -A map_no
-    declare -A map_jam
+    declare -a map_pid
+    declare -a map_no
+    declare -a map_jam
 
     while IFS='|' read -r pid no jam pesan; do
         echo -e "  ${GREEN}[$count]${NC} Jam: ${YELLOW}$jam${NC} | Ke: ${CYAN}$no${NC} | Pesan: \"$pesan\""
