@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Kode Warna ANSI (100% Didukung Termux)
+# Kode Warna ANSI
 CYAN='\033[1;36m'
 GREEN='\033[1;32m'
 YELLOW='\033[1;33m'
@@ -13,12 +13,15 @@ NC='\033[0m'
 JOB_FILE="$HOME/.wa_jobs.txt"
 touch "$JOB_FILE"
 
-# Auto-check izin storage HP
+# Auto-check izin storage HP & Kunci CPU agar Termux tidak ditidurkan Android
 if [ ! -d "$HOME/storage" ]; then
     echo -e "${YELLOW}[!] Menghubungkan izin penyimpanan HP ke Termux...${NC}"
     termux-setup-storage
     sleep 2
 fi
+
+# Aktifkan Wake Lock biar latar belakang gak dimatikan hemat baterai Android
+termux-wake-lock 2>/dev/null
 
 clear
 
@@ -85,7 +88,6 @@ batalkan_jadwal() {
     fi
 }
 
-# Fungsi otomatis kirim media (Foto / Video)
 kirim_media_action() {
     local no="$1"
     local file="$2"
@@ -187,6 +189,7 @@ while true; do
 
                 sisa_detik=$((target_epoch - current_epoch))
 
+                # DIBIKIN MANDIRI PAKAI DISOWN
                 (
                     sleep $sisa_detik
                     ext="${file##*.}"
@@ -200,12 +203,13 @@ while true; do
                             npx mudslide send-image --caption "$caption" "$no" "$file" >/dev/null 2>&1
                         fi
                     fi
-                ) &
+                ) >/dev/null 2>&1 &
                 bg_pid=$!
+                disown $bg_pid 2>/dev/null
                 echo "$bg_pid|$no|$jam_target|Media: $file" >> "$JOB_FILE"
 
                 echo -e "${GREEN}[OK] Jadwal media tersimpan! Terkirim jam $jam_target ke $no.${NC}"
-                echo -e "${CYAN}[>] Berjalan di background!${NC}"
+                echo -e "${CYAN}[>] Berjalan mandiri di background (Disowned)!${NC}"
             fi
             ;;
         3)
@@ -261,15 +265,17 @@ while true; do
 
                 sisa_detik=$((target_epoch - current_epoch))
 
+                # DIBIKIN MANDIRI PAKAI DISOWN
                 (
                     sleep $sisa_detik
                     npx mudslide send "$no" "$pesan" >/dev/null 2>&1
-                ) &
+                ) >/dev/null 2>&1 &
                 bg_pid=$!
+                disown $bg_pid 2>/dev/null
                 echo "$bg_pid|$no|$jam_target|$pesan" >> "$JOB_FILE"
 
                 echo -e "${GREEN}[OK] Jadwal tersimpan! Pesan untuk $no akan terkirim jam $jam_target.${NC}"
-                echo -e "${CYAN}[>] Berjalan di background!${NC}"
+                echo -e "${CYAN}[>] Berjalan mandiri di background (Disowned)!${NC}"
 
             elif [ "$sub5" == "2" ]; then
                 read -p "Berapa banyak jadwal chat yang ingin dibuat? " total_jadwal
@@ -291,11 +297,13 @@ while true; do
 
                     sisa_detik=$((target_epoch - current_epoch))
 
+                    # DIBIKIN MANDIRI PAKAI DISOWN
                     (
                         sleep $sisa_detik
                         npx mudslide send "$no" "$pesan" >/dev/null 2>&1
-                    ) &
+                    ) >/dev/null 2>&1 &
                     bg_pid=$!
+                    disown $bg_pid 2>/dev/null
                     echo "$bg_pid|$no|$jam_target|$pesan" >> "$JOB_FILE"
 
                     echo -e "${GREEN}[OK] [Jadwal $i] Dikirim jam $jam_target ke $no.${NC}"
