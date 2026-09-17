@@ -13,17 +13,14 @@ NC='\033[0m'
 JOB_FILE="$HOME/.wa_jobs.txt"
 touch "$JOB_FILE"
 
-# Auto-check izin storage HP & Kunci CPU agar Termux tidak ditidurkan Android
+# Auto-check izin storage HP & Kunci CPU Termux
 if [ ! -d "$HOME/storage" ]; then
     echo -e "${YELLOW}[!] Menghubungkan izin penyimpanan HP ke Termux...${NC}"
     termux-setup-storage
     sleep 2
 fi
 
-# Aktifkan Wake Lock biar latar belakang gak dimatikan hemat baterai Android
 termux-wake-lock 2>/dev/null
-
-clear
 
 format_nomor() {
     local num="$1"
@@ -96,27 +93,39 @@ kirim_media_action() {
     ext="${file##*.}"
     ext=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
 
-    if [[ "$ext" == "mp4" || "$ext" == "mkv" || "$ext" == "avi" || "$ext" == "mov" ]]; then
-        echo -e "${BLUE}[*] Mengirim VIDEO ke $no...${NC}"
-        npx mudslide send-file --type video "$no" "$file"
-    else
-        echo -e "${BLUE}[*] Mengirim FOTO ke $no...${NC}"
-        if [ -z "$caption" ]; then
-            npx mudslide send-image "$no" "$file"
-        else
-            npx mudslide send-image --caption "$caption" "$no" "$file"
-        fi
-    fi
+    case "$ext" in
+        jpg|jpeg|png|webp|gif)
+            echo -e "${BLUE}[*] Mengirim FOTO ke $no...${NC}"
+            if [ -z "$caption" ]; then
+                npx mudslide send-image "$no" "$file"
+            else
+                npx mudslide send-image --caption "$caption" "$no" "$file"
+            fi
+            ;;
+        mp4|mkv|avi|mov)
+            echo -e "${BLUE}[*] Mengirim VIDEO ke $no...${NC}"
+            npx mudslide send-file --type video "$no" "$file"
+            ;;
+        mp3|wav|m4a|ogg|flac|aac)
+            echo -e "${BLUE}[*] Mengirim AUDIO / MUSIK ke $no...${NC}"
+            npx mudslide send-file --type audio "$no" "$file"
+            ;;
+        *)
+            echo -e "${BLUE}[*] Mengirim FILE / DOKUMEN ke $no...${NC}"
+            npx mudslide send-file "$no" "$file"
+            ;;
+    esac
 }
 
 while true; do
+    clear # LAYAR OTOMATIS BERSIH SETIAP BALIK KE MENU UTAMA
     echo -e "${CYAN}==========================================================${NC}"
     echo -e "${WHITE}                 TOOL WA AUTOMATION (CLI)                 ${NC}"
     echo -e "${YELLOW}              Termux Edition v2.0 | WSTRN681              ${NC}"
     echo -e "${CYAN}==========================================================${NC}"
     echo ""
     echo -e "  ${GREEN}[1]${NC} Kirim Pesan Teks (Singel / Multi Chat)"
-    echo -e "  ${GREEN}[2]${NC} Kirim Media Foto / Video (Langsung & Terjadwal)"
+    echo -e "  ${GREEN}[2]${NC} Kirim Media (Foto, Video, MP3, Dokumen)"
     echo -e "  ${GREEN}[3]${NC} Kirim Pesan Broadcast (Banyak Nomor)"
     echo ""
     echo -e "  ${GREEN}[4]${NC} Kirim Pesan Berulang (Looping)"
@@ -159,23 +168,23 @@ while true; do
             ;;
         2)
             echo ""
-            echo -e "${YELLOW}--- [ KIRIM MEDIA FOTO / VIDEO ] ---${NC}"
+            echo -e "${YELLOW}--- [ KIRIM MEDIA / FILE ] ---${NC}"
             echo "1. Kirim Media Langsung"
             echo "2. Kirim Media Terjadwal (Jam Realtime)"
             read -p "Pilih opsi [1-2]: " sub2
 
             if [ "$sub2" == "1" ]; then
                 read -p "Masukkan no telepon: " no
-                read -p "Lokasi file (/sdcard/Download/foto.png / video.mp4): " file
-                read -p "Masukkan caption (kosongkan jika tanpa caption): " caption
+                read -p "Lokasi file (contoh: /sdcard/Download/musik.mp3): " file
+                read -p "Masukkan caption (hanya untuk gambar/kosongkan): " caption
                 no=$(format_nomor "$no")
                 
                 kirim_media_action "$no" "$file" "$caption"
 
             elif [ "$sub2" == "2" ]; then
                 read -p "Masukkan no telepon: " no
-                read -p "Lokasi file (/sdcard/Download/foto.png / video.mp4): " file
-                read -p "Masukkan caption (kosongkan jika tanpa caption): " caption
+                read -p "Lokasi file (contoh: /sdcard/Download/musik.mp3): " file
+                read -p "Masukkan caption (hanya untuk gambar/kosongkan): " caption
                 read -p "Masukkan jam kirim (Format HH:MM, contoh 14:30): " jam_target
                 no=$(format_nomor "$no")
 
@@ -189,27 +198,16 @@ while true; do
 
                 sisa_detik=$((target_epoch - current_epoch))
 
-                # DIBIKIN MANDIRI PAKAI DISOWN
                 (
                     sleep $sisa_detik
-                    ext="${file##*.}"
-                    ext=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
-                    if [[ "$ext" == "mp4" || "$ext" == "mkv" || "$ext" == "avi" || "$ext" == "mov" ]]; then
-                        npx mudslide send-file --type video "$no" "$file" >/dev/null 2>&1
-                    else
-                        if [ -z "$caption" ]; then
-                            npx mudslide send-image "$no" "$file" >/dev/null 2>&1
-                        else
-                            npx mudslide send-image --caption "$caption" "$no" "$file" >/dev/null 2>&1
-                        fi
-                    fi
+                    kirim_media_action "$no" "$file" "$caption" >/dev/null 2>&1
                 ) >/dev/null 2>&1 &
                 bg_pid=$!
                 disown $bg_pid 2>/dev/null
-                echo "$bg_pid|$no|$jam_target|Media: $file" >> "$JOB_FILE"
+                echo "$bg_pid|$no|$jam_target|File: $file" >> "$JOB_FILE"
 
-                echo -e "${GREEN}[OK] Jadwal media tersimpan! Terkirim jam $jam_target ke $no.${NC}"
-                echo -e "${CYAN}[>] Berjalan mandiri di background (Disowned)!${NC}"
+                echo -e "${GREEN}[OK] Jadwal file tersimpan! Terkirim jam $jam_target ke $no.${NC}"
+                echo -e "${CYAN}[>] Berjalan mandiri di background!${NC}"
             fi
             ;;
         3)
@@ -265,7 +263,6 @@ while true; do
 
                 sisa_detik=$((target_epoch - current_epoch))
 
-                # DIBIKIN MANDIRI PAKAI DISOWN
                 (
                     sleep $sisa_detik
                     npx mudslide send "$no" "$pesan" >/dev/null 2>&1
@@ -275,7 +272,7 @@ while true; do
                 echo "$bg_pid|$no|$jam_target|$pesan" >> "$JOB_FILE"
 
                 echo -e "${GREEN}[OK] Jadwal tersimpan! Pesan untuk $no akan terkirim jam $jam_target.${NC}"
-                echo -e "${CYAN}[>] Berjalan mandiri di background (Disowned)!${NC}"
+                echo -e "${CYAN}[>] Berjalan mandiri di background!${NC}"
 
             elif [ "$sub5" == "2" ]; then
                 read -p "Berapa banyak jadwal chat yang ingin dibuat? " total_jadwal
@@ -297,7 +294,6 @@ while true; do
 
                     sisa_detik=$((target_epoch - current_epoch))
 
-                    # DIBIKIN MANDIRI PAKAI DISOWN
                     (
                         sleep $sisa_detik
                         npx mudslide send "$no" "$pesan" >/dev/null 2>&1
@@ -317,6 +313,8 @@ while true; do
                 read -p "Tekan [Enter] untuk kembali, atau ketik [b] untuk batalkan jadwal: " opt_post
                 if [ "$opt_post" == "b" ] || [ "$opt_post" == "B" ]; then
                     batalkan_jadwal
+                    echo ""
+                    read -p "Tekan Enter untuk kembali ke menu..."
                 fi
                 continue
             fi
@@ -337,5 +335,4 @@ while true; do
 
     echo ""
     read -p "Tekan Enter untuk kembali ke menu..."
-    clear
 done
