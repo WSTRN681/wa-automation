@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Kode Warna ANSI (100% Didukung Termux)
+# Kode Warna ANSI
 CYAN='\033[1;36m'
 GREEN='\033[1;32m'
 YELLOW='\033[1;33m'
@@ -8,17 +8,73 @@ RED='\033[1;31m'
 BLUE='\033[1;34m'
 PURPLE='\033[1;35m'
 WHITE='\033[1;37m'
-NC='\033[0m' # No Color
+NC='\033[0m'
+
+JOB_FILE="$HOME/.wa_jobs.txt"
+touch "$JOB_FILE"
 
 clear
 
-# Fungsi perbaikan nomor (Hanya hapus angka 0 depan)
 format_nomor() {
     local num="$1"
     if [[ $num == 0* ]]; then
         echo "62${num#0}"
     else
         echo "$num"
+    fi
+}
+
+clean_jobs() {
+    if [ -f "$JOB_FILE" ]; then
+        local tmp_file="$HOME/.wa_jobs.tmp"
+        > "$tmp_file"
+        while IFS='|' read -r pid no jam pesan; do
+            if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                echo "$pid|$no|$jam|$pesan" >> "$tmp_file"
+            fi
+        done < "$JOB_FILE"
+        mv "$tmp_file" "$JOB_FILE"
+    fi
+}
+
+batalkan_jadwal() {
+    clean_jobs
+    if [ ! -s "$JOB_FILE" ]; then
+        echo -e "${YELLOW}[!] Tidak ada jadwal pesan aktif saat ini.${NC}"
+        return
+    fi
+
+    echo ""
+    echo -e "${CYAN}==========================================================${NC}"
+    echo -e "${WHITE}               DAFTAR JADWAL PESAN AKTIF                  ${NC}"
+    echo -e "${CYAN}==========================================================${NC}"
+    
+    local count=1
+    declare -A map_pid
+    declare -A map_no
+    declare -A map_jam
+
+    while IFS='|' read -r pid no jam pesan; do
+        echo -e "  ${GREEN}[$count]${NC} Jam: ${YELLOW}$jam${NC} | Ke: ${CYAN}$no${NC} | Pesan: \"$pesan\""
+        map_pid[$count]=$pid
+        map_no[$count]=$no
+        map_jam[$count]=$jam
+        ((count++))
+    done < "$JOB_FILE"
+
+    echo -e "${CYAN}==========================================================${NC}"
+    read -p " >> Pilih nomor chat yang ingin DIBATALKAN (0 untuk batal): " pilih_batal
+
+    if [[ "$pilih_batal" =~ ^[0-9]+$ ]] && [ "$pilih_batal" -ge 1 ] && [ "$pilih_batal" -lt "$count" ]; then
+        target_pid=${map_pid[$pilih_batal]}
+        target_no=${map_no[$pilih_batal]}
+        target_jam=${map_jam[$pilih_batal]}
+
+        kill "$target_pid" 2>/dev/null
+        clean_jobs
+        echo -e "${RED}[OK] Jadwal jam $target_jam ke $target_no BERHASIL DIBATALKAN!${NC}"
+    else
+        echo -e "${YELLOW}[*] Pembatalan dilewati.${NC}"
     fi
 }
 
@@ -33,7 +89,7 @@ while true; do
     echo -e "  ${GREEN}[3]${NC} Kirim Pesan Broadcast (Banyak Nomor)"
     echo ""
     echo -e "  ${GREEN}[4]${NC} Kirim Pesan Berulang (Looping)"
-    echo -e "  ${GREEN}[5]${NC} Kirim Pesan Terjadwal (Jam Realtime)"
+    echo -e "  ${GREEN}[5]${NC} Kirim Pesan Terjadwal & Kelola Jadwal"
     echo ""
     echo -e "  ${GREEN}[6]${NC} Cek Status Login WhatsApp"
     echo -e "  ${GREEN}[0]${NC} Keluar"
@@ -119,7 +175,8 @@ while true; do
             echo -e "${YELLOW}--- [ KIRIM PESAN TERJADWAL ] ---${NC}"
             echo "1. Kirim 1 Chat Terjadwal"
             echo "2. Kirim Banyak Chat Terjadwal Sekaligus"
-            read -p "Pilih opsi [1-2]: " sub5
+            echo "3. Lihat & Batalkan Jadwal Aktif"
+            read -p "Pilih opsi [1-3]: " sub5
 
             if [ "$sub5" == "1" ]; then
                 read -p "Masukkan no telepon: " no
@@ -141,9 +198,11 @@ while true; do
                     sleep $sisa_detik
                     npx mudslide send "$no" "$pesan" >/dev/null 2>&1
                 ) &
+                bg_pid=$!
+                echo "$bg_pid|$no|$jam_target|$pesan" >> "$JOB_FILE"
 
-                echo -e "${GREEN}[OK] Jadwal tersimpan! Pesan untuk $no akan terkirim jam $jam_target (dalam $sisa_detik detik).${NC}"
-                echo -e "${CYAN}[>] Berjalan di background! Kamu bisa langsung pakai Termux lagi.${NC}"
+                echo -e "${GREEN}[OK] Jadwal tersimpan! Pesan untuk $no akan terkirim jam $jam_target.${NC}"
+                echo -e "${CYAN}[>] Berjalan di background!${NC}"
 
             elif [ "$sub5" == "2" ]; then
                 read -p "Berapa banyak jadwal chat yang ingin dibuat? " total_jadwal
@@ -169,9 +228,22 @@ while true; do
                         sleep $sisa_detik
                         npx mudslide send "$no" "$pesan" >/dev/null 2>&1
                     ) &
+                    bg_pid=$!
+                    echo "$bg_pid|$no|$jam_target|$pesan" >> "$JOB_FILE"
 
-                    echo -e "${GREEN}[OK] [Jadwal $i] Dikirim jam $jam_target ke $no (Latar belakang aktif!).${NC}"
+                    echo -e "${GREEN}[OK] [Jadwal $i] Dikirim jam $jam_target ke $no.${NC}"
                 done
+            elif [ "$sub5" == "3" ]; then
+                batalkan_jadwal
+            fi
+
+            if [ "$sub5" == "1" ] || [ "$sub5" == "2" ]; then
+                echo ""
+                read -p "Tekan [Enter] untuk kembali, atau ketik [b] untuk batalkan jadwal: " opt_post
+                if [ "$opt_post" == "b" ] || [ "$opt_post" == "B" ]; then
+                    batalkan_jadwal
+                fi
+                continue
             fi
             ;;
         6)
