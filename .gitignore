@@ -1,0 +1,7 @@
+.git-credentials
+.wa_jobs.txt
+.wa_history.log
+.wa_config.txt
+node_modules/
+.local/
+npm/

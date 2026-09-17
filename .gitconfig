@@ -1,3 +1,5 @@
 [user]
 	name = WSTRN601
 	email = wildanfakhruddin60@gmail.com
+[credential]
+	helper = store
